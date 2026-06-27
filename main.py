@@ -1,10 +1,11 @@
-from src.preprocess import load_data, preprocess
+from src.data.loader import load_dataset
+from src.preprocessing.preprocess import preprocess
 from src.train import train_model
 
 def main():
 
     print("Loading data...")
-    X, y = load_data()
+    X, y = load_dataset()
 
     print("Preprocessing...")
     X = preprocess(X)
