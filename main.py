@@ -1,34 +1,103 @@
-from src.train import train_model
+from pathlib import Path
+
 from src.data.loader import load_dataset
 from src.preprocessing.preprocess import preprocess
 from src.feature_selection.select import variance_filter
 from src.feature_selection.supervised import anova_feature_selection
-from src.interpretation.shap_explainer import compute_shap_values, get_shap_importance
-from src.interpretation.biomarker import save_biomarkers
+
+from src.training.train import train_model
 from src.explain import run_shap_analysis
+
+from src.training.save_results import (
+    save_metrics,
+    save_fold_results
+)
+
+from src.training.plots import (
+    save_roc,
+    save_confusion_matrix
+)
+
+RESULTS_DIR = Path("results")
+RESULTS_DIR.mkdir(exist_ok=True)
 
 
 def main():
 
-    print("Loading data...")
+    # ----------------------------------------------------
+    # Load dataset
+    # ----------------------------------------------------
+    print("Loading dataset...")
     X, y = load_dataset()
 
-    print("Feature selection...")
+    # ----------------------------------------------------
+    # Feature selection
+    # ----------------------------------------------------
+    print("Variance filtering...")
     X = variance_filter(X)
 
-    print("Supervised feature selection (ANOVA)...")
-    X, selector = anova_feature_selection(X, y, k=1000)
+    print("ANOVA feature selection...")
+    X, selector = anova_feature_selection(
+        X,
+        y,
+        k=1000
+    )
 
+    # ----------------------------------------------------
+    # Preprocessing
+    # ----------------------------------------------------
     print("Preprocessing...")
     X = preprocess(X)
 
-    print("Training model...")
-    model = train_model(X, y)
+    # ----------------------------------------------------
+    # Model Training
+    # ----------------------------------------------------
+    print("Training XGBoost model...")
 
-    print("SHAP + Biomarkers...")
-    model, importance = run_shap_analysis(X, y)
+    model, fold_results, metrics, last = train_model(
+        X,
+        y
+    )
 
-    print("Done ✔")
+    # ----------------------------------------------------
+    # Save evaluation
+    # ----------------------------------------------------
+    print("Saving evaluation results...")
+
+    save_fold_results(
+        fold_results,
+        RESULTS_DIR / "fold_results.csv"
+    )
+
+    save_metrics(
+        metrics,
+        RESULTS_DIR / "metrics.json"
+    )
+
+    save_roc(
+        last["y_test"],
+        last["probs"],
+        RESULTS_DIR / "roc_curve.png"
+    )
+
+    save_confusion_matrix(
+        last["y_test"],
+        last["preds"],
+        RESULTS_DIR / "confusion_matrix.png"
+    )
+
+    # ----------------------------------------------------
+    # SHAP Interpretation
+    # ----------------------------------------------------
+    print("Running SHAP analysis...")
+
+    run_shap_analysis(
+        X,
+        y
+    )
+
+    print("\nPipeline finished successfully.")
+
 
 if __name__ == "__main__":
     main()
